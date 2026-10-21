@@ -78,8 +78,14 @@ button:disabled{opacity:0.7;cursor:not-allowed}
 <div id="modal-aide" class="modal">
   <div class="modal-box">
     <h2>❓ Comment utiliser le Carnet</h2>
-    <p><b>📒 C'est quoi ?</b><br>Le Carnet de dettes vous aide à noter les dettes de vos clients et leurs paiements.</p>
-    <button class="btn-green" onclick="fermerAide()">Fermer</button>
+    <div style="text-align: left; line-height: 1.5; color: #333;">
+      <p><b>📒 C'est quoi ?</b><br>Le Carnet de dettes vous aide à noter et suivre les dettes de vos clients ainsi que leurs paiements en toute simplicité.</p>
+      <p><b>👤 1. Se connecter</b><br>Entrez votre numéro de téléphone et votre code PIN pour accéder à votre espace personnel sécurisé.</p>
+      <p><b>📝 2. Enregistrer une dette</b><br>Sélectionnez ou ajoutez un client, saisissez le montant de la dette et ajoutez un libellé (ex: marchandises, crédit...).</p>
+      <p><b>💵 3. Enregistrer un versement</b><br>Lorsqu'un client effectue un remboursement, indiquez le montant payé. Le solde restant est recalculé automatiquement.</p>
+      <p><b>⚙️ 4. Espace Admin</b><br>Réservé aux administrateurs pour la gestion des utilisateurs et le contrôle global des données.</p>
+    </div>
+    <button class="btn-green" onclick="fermerAide()" style="margin-top: 15px;">Fermer</button>
   </div>
 </div>
 
