@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carnet de dettes</title>
+<link rel="manifest" href="manifest.json">
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:system-ui;margin:0;background:#f5f5f5;color:#222}
+.page{display:none;max-width:500px;margin:0 auto;padding:16px}
+.page.active{display:block}
+h1{font-size:22px;margin-bottom:16px}
+input{width:100%;padding:12px;margin-bottom:10px;border:1px solid #ccc;border-radius:10px;font-size:16px;box-sizing:border-box}
+button{width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:8px;position:relative}
+button:disabled{opacity:0.7;cursor:not-allowed}
+.btn-green{background:#1f7a4d;color:#fff}
+.btn-red{background:#c0392b;color:#fff}
+.btn-gray{background:#eee;color:#333}
+.btn-blue{background:#2980b9;color:#fff}
+.btn-purple{background:#8e44ad;color:#fff}
+.btn-install{background:#d35400;color:#fff;display:none;}
+.btn-small-text{padding:10px 12px;font-size:14px;font-weight:normal;}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+.total{background:#1f7a4d;color:#fff;border-radius:12px;padding:16px;margin-bottom:14px}
+.total b{font-size:24px;display:block}
+.owe{color:#c0392b;font-weight:bold}
+.ok{color:#1f7a4d;font-weight:bold}
+.msg{color:red;margin-bottom:10px;font-size:14px}
+[data-overlay-container="true"]{display:none!important;}
+#page-login.active{min-height:100vh;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;}
+#page-login .bg-drapeau{position:absolute;top:0;left:0;right:0;bottom:0;background:url('https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg') center/cover no-repeat;opacity:0.10;z-index:0;}
+#page-login .contenu{position:relative;z-index:1;}
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;justify-content:center;align-items:center;}
+.modal.active{display:flex;}
+.modal-box{background:#fff;border-radius:16px;padding:20px;max-width:460px;width:90%;max-height:80vh;overflow-y:auto;}
+.modal-box h2{margin-top:0;color:#1f7a4d}
+.devise-btn{display:inline-block;padding:10px 20px;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;border:2px solid #ccc;background:#fff;margin:4px;}
+.devise-btn.selected{border-color:#1f7a4d;background:#1f7a4d;color:#fff;}
+
+#offline-banner {
+  display: none;
+  background: #e67e22;
+  color: white;
+  text-align: center;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.8s ease-in-out infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+</style>
+</head>
+<body>
+
+<div id="offline-banner">⚠️ Mode hors ligne : Vos actions seront synchronisées au retour du réseau.</div>
+
+<!-- MODAL AIDE -->
+<div id="modal-aide" class="modal">
+  <div class="modal-box">
+    <h2>❓ Comment utiliser le Carnet</h2>
+    <p><b>📒 C'est quoi ?</b><br>Le Carnet de dettes vous aide à noter les dettes de vos clients et leurs paiements.</p>
+    <button class="btn-green" onclick="fermerAide()">Fermer</button>
+  </div>
+</div>
+
+<!-- PAGE CONNEXION -->
+<div id="page-login" class="page active">
+  <div class="bg-drapeau"></div>
+  <div class="contenu">
+    <h1>📒 Carnet de dettes <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg" style="height:28px;vertical-align:middle;border-radius:4px;margin-left:6px"></h1>
+    <p>Connectez-vous avec votre numéro et votre PIN</p>
+    <input id="login-tel" type="tel" placeholder="Numéro de téléphone">
+    <input id="login-pin" type="password" placeholder="Code PIN (4 chiffres)" maxlength="4">
+    <div id="login-msg" class="msg"></div>
+    <button id="btn-login" class="btn-green" onclick="seConnecter()">Se connecter</button>
+    <button class="btn-gray" onclick="afficher('page-inscription')">Créer un compte</button>
+    
+    <!-- BOUTON D'INSTALLATION DIRECTE -->
+    <button id="btn-install" class="btn-install" onclick="installerApp()">📲 Installer l'application sur le téléphone</button>
+
+    <!-- BOUTONS AIDE ET ADMIN -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;">
+      <button class="btn-blue btn-small-text" onclick="ouvrirAide()">❓ Aide</button>
+      <button class="btn-purple btn-small-text" onclick="ouvrirAdminPrompt()">🔒 Admin</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE ADMIN -->
+<div id="page-admin" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1>👥 Utilisateurs</h1>
+    <button onclick="afficher('page-login')" style="width:auto;padding:8px 12px;background:#eee;border:none;border-radius:8px;cursor:pointer">Retour</button>
+  </div>
+  <div class="total"><small>Total vendeurs</small><b id="admin-nb-vendeurs">0</b></div>
+  <div id="liste-vendeurs-admin"></div>
+</div>
+
+<!-- PAGE INSCRIPTION -->
+<div id="page-inscription" class="page">
+  <h1>Nouveau compte</h1>
+  <input id="reg-nom" placeholder="Votre nom">
+  <input id="reg-tel" type="tel" placeholder="Numéro de téléphone">
+  <input id="reg-pin" type="password" placeholder="PIN (4 chiffres)" maxlength="4">
+  <div id="reg-msg" class="msg"></div>
+  <button id="btn-reg" class="btn-green" onclick="sInscrire()">Créer mon compte</button>
+  <button class="btn-gray" onclick="afficher('page-login')">Retour</button>
+</div>
+
+<!-- PAGE LISTE CLIENTS -->
+<div id="page-clients" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1>Mes clients</h1>
+    <button onclick="seDeconnecter()" style="width:auto;padding:8px 12px;background:#eee;border:none;border-radius:8px;cursor:pointer">Déconnexion</button>
+  </div>
+  
+  <div class="total" style="display:flex;justify-content:space-between;align-items:center;">
+    <div style="flex:1; border-right:1px solid rgba(255,255,255,0.3); padding-right:10px;">
+      <small>Total FC</small>
+      <b id="montant-total-fc">0 FC</b>
+    </div>
+    <div style="flex:1; padding-left:15px;">
+      <small>Total Dollars</small>
+      <b id="montant-total-usd">0 $</b>
+    </div>
+  </div>
+
+  <button class="btn-green" onclick="afficher('page-nouveau-client')">+ Nouveau client</button>
+  <div id="liste-clients"></div>
+</div>
+
+<!-- PAGE NOUVEAU CLIENT -->
+<div id="page-nouveau-client" class="page">
+  <h1>Nouveau client</h1>
+  <input id="client-nom" placeholder="Nom du client">
+  <input id="client-tel" type="tel" placeholder="Téléphone (facultatif)">
+  <div id="client-msg" class="msg"></div>
+  <button id="btn-add-client" class="btn-green" onclick="ajouterClient()">Enregistrer</button>
+  <button class="btn-gray" onclick="afficher('page-clients')">Annuler</button>
+</div>
+
+<!-- PAGE DETAIL CLIENT -->
+<div id="page-detail" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 id="detail-nom">Client</h1>
+    <button onclick="afficher('page-clients')" style="width:auto;padding:8px 12px;background:#eee;border:none;border-radius:8px;cursor:pointer">Retour</button>
+  </div>
+  <div id="detail-total" class="total"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <button class="btn-red" onclick="ouvrirOperation('dette')">+ Dette</button>
+    <button class="btn-green" onclick="ouvrirOperation('paiement')">− Paiement</button>
+  </div>
+  <div id="form-operation" style="display:none">
+    <div class="card">
+      <div style="margin-bottom:10px">
+        <b>Devise :</b><br>
+        <span class="devise-btn selected" id="btn-fc" onclick="choisirDevise('FC')">FC</span>
+        <span class="devise-btn" id="btn-usd" onclick="choisirDevise('$')">$</span>
+      </div>
+      <input id="op-montant" type="number" placeholder="Montant">
+      <input id="op-note" placeholder="Note (ex: sac de riz)">
+      <div id="op-msg" class="msg"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button class="btn-gray" onclick="fermerOperation()">Annuler</button>
+        <button id="btn-valider-op" class="btn-green" onclick="enregistrerOperation()">Valider</button>
+      </div>
+    </div>
+  </div>
+  <button class="btn-red" style="margin-top:20px" onclick="supprimerClient()">🗑️ Supprimer</button>
+  <h3>Historique</h3>
+  <div id="liste-operations"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://tosidqjhstmltpduvgvl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RlugtXnIhAW2Lrs04xzRmw_jH0aBVNI';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let vendeurId = null;
+let clientActuel = null;
+let typeOp = null;
+let deviseChoisie = 'FC';
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const btnInstall = document.getElementById('btn-install');
+  if (btnInstall) btnInstall.style.display = 'block';
+});
+
+async function installerApp() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      const btnInstall = document.getElementById('btn-install');
+      if (btnInstall) btnInstall.style.display = 'none';
+    }
+    deferredPrompt = null;
+  }
+}
+
+window.addEventListener('online', async () => {
+  const banner = document.getElementById('offline-banner');
+  if (banner) banner.style.display = 'none';
+  await synchroniserFileAttente();
+  if (vendeurId) chargerClients();
+});
+
+window.addEventListener('offline', () => {
+  const banner = document.getElementById('offline-banner');
+  if (banner) banner.style.display = 'block';
+});
+
+function afficher(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById(pageId);
+  if (target) target.classList.add('active');
+}
+
+function ouvrirAide() { 
+  const modal = document.getElementById('modal-aide');
+  if (modal) modal.classList.add('active'); 
+}
+
+function fermerAide() { 
+  const modal = document.getElementById('modal-aide');
+  if (modal) modal.classList.remove('active'); 
+}
+
+function choisirDevise(d) {
+  deviseChoisie = d;
+  const btnFc = document.getElementById('btn-fc');
+  const btnUsd = document.getElementById('btn-usd');
+  if (btnFc) btnFc.classList.toggle('selected', d === 'FC');
+  if (btnUsd) btnUsd.classList.toggle('selected', d === '$');
+}
+
+async function ouvrirAdminPrompt() {
+  const mdp = prompt("Code admin :");
+  if (mdp === "2026") {
+    let data = [];
+    if (navigator.onLine) {
+      const res = await sb.from('vendeurs').select('*').order('created_at', { ascending: false });
+      data = res.data || [];
+      localStorage.setItem('cache_vendeurs_admin', JSON.stringify(data));
+    } else {
+      const local = localStorage.getItem('cache_vendeurs_admin');
+      if (local) data = JSON.parse(local);
+    }
+    const liste = document.getElementById('liste-vendeurs-admin');
+    if (liste) {
+      liste.innerHTML = '';
+      const nbVendeurs = document.getElementById('admin-nb-vendeurs');
+      if (nbVendeurs) nbVendeurs.textContent = data.length;
+      data.forEach(v => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `<b>${v.nom}</b><br>📞 ${v.telephone}`;
+        liste.appendChild(div);
+      });
+    }
+    afficher('page-admin');
+  } else if (mdp !== null) { 
+    alert("Incorrect"); 
+  }
+}
+
+async function sInscrire() {
+  const nom = document.getElementById('reg-nom').value.trim();
+  const tel = document.getElementById('reg-tel').value.trim();
+  const pin = document.getElementById('reg-pin').value.trim();
+  const msg = document.getElementById('reg-msg');
+  
+  if (!nom || !tel || !pin) { msg.textContent = 'Remplir tous les champs.'; return; }
+  if (pin.length !== 4) { msg.textContent = 'PIN 4 chiffres requis.'; return; }
+
+  if (!navigator.onLine) {
+    msg.textContent = 'Impossible de créer un compte hors ligne.';
+    return;
+  }
+
+  const { error } = await sb.from('vendeurs').insert([{ nom, telephone: tel, pin }]);
+  if (error) { msg.textContent = 'Erreur ou numéro existant.'; return; }
+  msg.style.color = 'green';
+  msg.textContent = 'Compte créé !';
+  setTimeout(() => afficher('page-login'), 1500);
+}
+
+async function seConnecter() {
+  const tel = document.getElementById('login-tel').value.trim();
+  const pin = document.getElementById('login-pin').value.trim();
+  const msg = document.getElementById('login-msg');
+  const btn = document.getElementById('btn-login');
+
+  if (!tel || !pin) { msg.textContent = 'Remplir tous les champs.'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Connexion...';
+
+  if (navigator.onLine) {
+    const { data, error } = await sb.from('vendeurs').select('*').eq('telephone', tel).eq('pin', pin).single();
+    btn.disabled = false;
+    btn.innerHTML = 'Se connecter';
+
+    if (error || !data) {
+      msg.textContent = 'Identifiants incorrects.';
+      return;
+    }
+    vendeurId = data.id;
+    localStorage.setItem('vendeur_id', vendeurId);
+    localStorage.setItem('offline_vendeur_' + tel, JSON.stringify(data));
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = 'Se connecter';
+    const cachedUser = localStorage.getItem('offline_vendeur_' + tel);
+    if (cachedUser) {
+      const user = JSON.parse(cachedUser);
+      if (user.pin === pin) {
+        vendeurId = user.id;
+        localStorage.setItem('vendeur_id', vendeurId);
+      } else {
+        msg.textContent = 'PIN incorrect.';
+        return;
+      }
+    } else {
+      msg.textContent = 'Connexion internet requise pour une première connexion.';
+      return;
+    }
+  }
+
+  await chargerClients();
+  afficher('page-clients');
+}
+
+function seDeconnecter() {
+  vendeurId = null;
+  localStorage.removeItem('vendeur_id');
+  afficher('page-login');
+}
+
+async function chargerClients() {
+  if (!vendeurId) return;
+  let clientsData = [];
+
+  if (navigator.onLine) {
+    const { data } = await sb.from('clients').select('*').eq('vendeur_id', vendeurId).order('created_at', { ascending: false });
+    if (data) {
+      clientsData = data;
+      localStorage.setItem('cache_clients_' + vendeurId, JSON.stringify(data));
+    }
+  } else {
+    const local = localStorage.getItem('cache_clients_' + vendeurId);
+    if (local) clientsData = JSON.parse(local);
+  }
+  
+  const liste = document.getElementById('liste-clients');
+  if (!liste) return;
+  liste.innerHTML = '';
+  
+  let totalFC = 0;
+  let totalUSD = 0;
+
+  for (const c of clientsData || []) {
+    const bal = await calculerSolde(c.id);
+    totalFC += Math.max(0, bal.fc);
+    totalUSD += Math.max(0, bal.usd);
+
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.style.cursor = 'pointer';
+    let soldeTexte = '';
+    if (bal.fc > 0 && bal.usd > 0) soldeTexte = `${bal.fc.toLocaleString()} FC + ${bal.usd.toLocaleString()} $`;
+    else if (bal.fc > 0) soldeTexte = `${bal.fc.toLocaleString()} FC`;
+    else if (bal.usd > 0) soldeTexte = `${bal.usd.toLocaleString()} $`;
+    else soldeTexte = 'Payé ✓';
+    
+    const couleur = (bal.fc > 0 || bal.usd > 0) ? 'owe' : 'ok';
+    div.innerHTML = `<div style="display:flex;justify-content:space-between"><span>${c.nom}</span><span class="${couleur}">${soldeTexte}</span></div>`;
+    div.onclick = () => ouvrirClient(c);
+    liste.appendChild(div);
+  }
+
+  const elFc = document.getElementById('montant-total-fc');
+  const elUsd = document.getElementById('montant-total-usd');
+  if (elFc) elFc.textContent = totalFC.toLocaleString() + ' FC';
+  if (elUsd) elUsd.textContent = totalUSD.toLocaleString() + ' $';
+}
+
+async function calculerSolde(clientId) {
+  let ops = [];
+  if (navigator.onLine) {
+    const { data } = await sb.from('operations').select('type,montant,devise').eq('client_id', clientId);
+    if (data) {
+      ops = data;
+      localStorage.setItem('cache_ops_' + clientId, JSON.stringify(data));
+    }
+  } else {
+    const local = localStorage.getItem('cache_ops_' + clientId);
+    if (local) ops = JSON.parse(local);
+  }
+
+  let fc = 0, usd = 0;
+  (ops || []).forEach(x => {
+    const v = x.type === 'dette' ? x.montant : -x.montant;
+    if (x.devise === '$') usd += v; else fc += v;
+  });
+  return { fc, usd };
+}
+
+async function ajouterClient() {
+  const nomInput = document.getElementById('client-nom');
+  const telInput = document.getElementById('client-tel');
+  const msg = document.getElementById('client-msg');
+  if (!nomInput) return;
+  
+  const nom = nomInput.value.trim();
+  const tel = telInput ? telInput.value.trim() : '';
+  
+  if (!nom) { msg.textContent = 'Entrez un nom.'; return; }
+
+  const nouveauClient = { id: 'temp_' + Date.now(), nom, telephone: tel, vendeur_id: vendeurId };
+
+  if (navigator.onLine) {
+    await sb.from('clients').insert([{ nom, telephone: tel, vendeur_id: vendeurId }]);
+  } else {
+    let localClients = JSON.parse(localStorage.getItem('cache_clients_' + vendeurId) || '[]');
+    localClients.unshift(nouveauClient);
+    localStorage.setItem('cache_clients_' + vendeurId, JSON.stringify(localClients));
+    
+    let queue = JSON.parse(localStorage.getItem('sync_queue') || '[]');
+    queue.push({ type: 'client', data: nouveauClient });
+    localStorage.setItem('sync_queue', JSON.stringify(queue));
+  }
+
+  nomInput.value = '';
+  if (telInput) telInput.value = '';
+  msg.textContent = '';
+  
+  await chargerClients();
+  afficher('page-clients');
+}
+
+async function ouvrirClient(c) {
+  clientActuel = c;
+  const detailNom = document.getElementById('detail-nom');
+  if (detailNom) detailNom.textContent = c.nom;
+  
+  const bal = await calculerSolde(c.id);
+  const dt = document.getElementById('detail-total');
+  const aDesDettes = bal.fc > 0 || bal.usd > 0;
+  if (dt) {
+    dt.style.background = aDesDettes ? '#c0392b' : '#1f7a4d';
+    let texte = '';
+    if (bal.fc > 0 && bal.usd > 0) texte = `${bal.fc.toLocaleString()} FC + ${bal.usd.toLocaleString()} $`;
+    else if (bal.fc > 0) texte = `${bal.fc.toLocaleString()} FC`;
+    else if (bal.usd > 0) texte = `${bal.usd.toLocaleString()} $`;
+    else texte = '0 FC';
+    
+    dt.innerHTML = `<small>${aDesDettes ? 'Doit encore' : 'Rien à payer'}</small><b>${texte}</b>`;
+  }
+  await chargerOperations(c.id);
+  afficher('page-detail');
+}
+
+async function chargerOperations(clientId) {
+  let ops = [];
+  if (navigator.onLine) {
+    const { data } = await sb.from('operations').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
+    if (data) {
+      ops = data;
+      localStorage.setItem('cache_ops_' + clientId, JSON.stringify(data));
+    }
+  } else {
+    const local = localStorage.getItem('cache_ops_' + clientId);
+    if (local) ops = JSON.parse(local);
+  }
+
+  const liste = document.getElementById('liste-operations');
+  if (!liste) return;
+  liste.innerHTML = '';
+  if (!ops || !ops.length) { liste.innerHTML = '<p style="color:#999">Aucune opération.</p>'; return; }
+  ops.forEach(x => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    const devise = x.devise || 'FC';
+    div.innerHTML = `<div style="display:flex;justify-content:space-between"><div>${x.type === 'dette' ? '📌 Dette' : '✅ Paiement'}<div style="font-size:13px;color:#888">${new Date(x.created_at || Date.now()).toLocaleDateString('fr-FR')}${x.note ? ' · ' + x.note : ''}</div></div><span class="${x.type === 'dette' ? 'owe' : 'ok'}">${x.type === 'dette' ? '+' : '−'}${Number(x.montant).toLocaleString()} ${devise}</span></div>`;
+    liste.appendChild(div);
+  });
+}
+
+function ouvrirOperation(type) {
+  typeOp = type;
+  deviseChoisie = 'FC';
+  choisirDevise('FC');
+  const opMontant = document.getElementById('op-montant');
+  const opNote = document.getElementById('op-note');
+  const opMsg = document.getElementById('op-msg');
+  const formOp = document.getElementById('form-operation');
+  const btnValider = document.getElementById('btn-valider-op');
+
+  if (opMontant) opMontant.value = '';
+  if (opNote) opNote.value = '';
+  if (opMsg) opMsg.textContent = '';
+  if (formOp) formOp.style.display = 'block';
+  if (btnValider) btnValider.className = type === 'dette' ? 'btn-red' : 'btn-green';
+}
+
+async function supprimerClient() {
+  if (!confirm('Supprimer ce client ?')) return;
+  if (navigator.onLine) {
+    await sb.from('operations').delete().eq('client_id', clientActuel.id);
+    await sb.from('clients').delete().eq('id', clientActuel.id);
+  } else {
+    alert("La suppression nécessite une connexion internet.");
+    return;
+  }
+  await chargerClients();
+  afficher('page-clients');
+}
+
+function fermerOperation() {
+  const formOp = document.getElementById('form-operation');
+  if (formOp) formOp.style.display = 'none';
+}
+
+async function enregistrerOperation() {
+  const montantInput = document.getElementById('op-montant');
+  const noteInput = document.getElementById('op-note');
+  const msg = document.getElementById('op-msg');
+  if (!montantInput) return;
+
+  const montant = parseFloat(montantInput.value);
+  const note = noteInput ? noteInput.value.trim() : '';
+  
+  if (!(montant > 0)) { msg.textContent = 'Montant invalide.'; return; }
+
+  const nouvelleOp = { client_id: clientActuel.id, type: typeOp, montant, note, devise: deviseChoisie, created_at: new Date().toISOString() };
+
+  if (navigator.onLine) {
+    await sb.from('operations').insert([nouvelleOp]);
+  } else {
+    let localOps = JSON.parse(localStorage.getItem('cache_ops_' + clientActuel.id) || '[]');
+    localOps.unshift(nouvelleOp);
+    localStorage.setItem('cache_ops_' + clientActuel.id, JSON.stringify(localOps));
+
+    let queue = JSON.parse(localStorage.getItem('sync_queue') || '[]');
+    queue.push({ type: 'operation', data: nouvelleOp });
+    localStorage.setItem('sync_queue', JSON.stringify(queue));
+  }
+
+  fermerOperation();
+  await chargerClients();
+  await ouvrirClient(clientActuel);
+}
+
+async function synchroniserFileAttente() {
+  let queue = JSON.parse(localStorage.getItem('sync_queue') || '[]');
+  if (queue.length === 0) return;
+
+  for (let item of queue) {
+    if (item.type === 'client') {
+      await sb.from('clients').insert([{ nom: item.data.nom, telephone: item.data.telephone, vendeur_id: item.data.vendeur_id }]);
+    } else if (item.type === 'operation') {
+      await sb.from('operations').insert([item.data]);
+    }
+  }
+
+  localStorage.removeItem('sync_queue');
+}
+
+window.onload = async () => {
+  if (!navigator.onLine) {
+    const banner = document.getElementById('offline-banner');
+    if (banner) banner.style.display = 'block';
+  } else {
+    await synchroniserFileAttente();
+  }
+
+  const id = localStorage.getItem('vendeur_id');
+  if (id) { 
+    vendeurId = id; 
+    await chargerClients(); 
+    afficher('page-clients'); 
+  }
+};
+</script>
+</body>
+</html>
