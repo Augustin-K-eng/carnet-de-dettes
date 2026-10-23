@@ -33,9 +33,19 @@ button:disabled{opacity:0.7;cursor:not-allowed}
 .ok{color:#1f7a4d;font-weight:bold}
 .msg{color:red;margin-bottom:10px;font-size:14px}
 [data-overlay-container="true"]{display:none!important;}
-#page-login.active{min-height:100vh;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;}
+
+#page-login.active{
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  padding: 16px;
+  position: relative;
+}
 #page-login .bg-drapeau{position:absolute;top:0;left:0;right:0;bottom:0;background:url('https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg') center/cover no-repeat;opacity:0.10;z-index:0;}
 #page-login .contenu{position:relative;z-index:1;}
+
 .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;justify-content:center;align-items:center;}
 .modal.active{display:flex;}
 .modal-box{background:#fff;border-radius:16px;padding:20px;max-width:460px;width:90%;max-height:80vh;overflow-y:auto;}
@@ -104,9 +114,10 @@ button:disabled{opacity:0.7;cursor:not-allowed}
 <!-- PAGE CONNEXION -->
 <div id="page-login" class="page active">
   <div class="bg-drapeau"></div>
-  <div class="contenu">
-    <h1>📒 Carnet de dettes <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg" style="height:28px;vertical-align:middle;border-radius:4px;margin-left:6px"></h1>
-    <p>Connectez-vous avec votre numéro et votre PIN</p>
+  
+  <div class="contenu" style="margin-top: auto; margin-bottom: auto;">
+    <h1 style="margin-bottom: 8px;">📒 Carnet de dettes <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg" style="height:28px;vertical-align:middle;border-radius:4px;margin-left:6px"></h1>
+    <p style="margin-top: 0; margin-bottom: 12px;">Connectez-vous avec votre numéro et votre PIN</p>
     <input id="login-tel" type="tel" placeholder="Numéro de téléphone">
     <input id="login-pin" type="password" placeholder="Code PIN (4 chiffres)" maxlength="4">
     <div id="login-msg" class="msg"></div>
@@ -123,24 +134,24 @@ button:disabled{opacity:0.7;cursor:not-allowed}
     </div>
   </div>
 
-  <!-- BLOC CONTACT FIXÉ TOUT EN BAS DE L'ÉCRAN -->
-  <div style="position: absolute; bottom: 15px; left: 0; right: 0; text-align: center; font-size: 13px; color: #333; z-index: 10;">
-    <div style="width: 50px; height: 1px; background: rgba(0,0,0,0.15); margin: 0 auto 8px auto;"></div>
+  <!-- BLOC CONTACT EN BAS DE PAGE -->
+  <div style="position: relative; z-index: 1; text-align: center; font-size: 13px; color: #333; padding-top: 5px;">
+    <div style="width: 50px; height: 1px; background: rgba(0,0,0,0.15); margin: 0 auto 6px auto;"></div>
     
-    <p style="margin: 4px 0; display: flex; align-items: center; justify-content: center; gap: 6px;">
+    <p style="margin: 3px 0;">
       <a href="https://wa.me/243998428385" target="_blank" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: #1f7a4d; text-decoration: none; font-weight: bold;">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" style="width: 16px; height: 16px; vertical-align: middle;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" style="width: 15px; height: 15px; vertical-align: middle;">
         +243998428385
       </a>
     </p>
 
-    <p style="margin: 4px 0; display: flex; align-items: center; justify-content: center; gap: 6px;">
+    <p style="margin: 3px 0;">
       <a href="mailto:augustinkalembu85@gmail.com" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: #444; text-decoration: none; font-weight: 600;">
         ✉️ augustinkalembu85@gmail.com
       </a>
     </p>
 
-    <p style="margin: 4px 0; font-weight: bold; color: #1f7a4d; text-align: center;">
+    <p style="margin: 3px 0; font-weight: bold; color: #1f7a4d; text-align: center;">
       DRC
     </p>
   </div>
