@@ -298,6 +298,7 @@ async function sInscrire() {
   const tel = document.getElementById('reg-tel').value.trim();
   const pin = document.getElementById('reg-pin').value.trim();
   const msg = document.getElementById('reg-msg');
+  const btn = document.getElementById('btn-reg');
   
   if (!nom || !tel || !pin) { msg.textContent = 'Remplir tous les champs.'; return; }
   if (pin.length !== 4) { msg.textContent = 'PIN 4 chiffres requis.'; return; }
@@ -307,7 +308,14 @@ async function sInscrire() {
     return;
   }
 
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Création en cours...';
+
   const { error } = await sb.from('vendeurs').insert([{ nom, telephone: tel, pin }]);
+  
+  btn.disabled = false;
+  btn.innerHTML = 'Créer mon compte';
+
   if (error) { msg.textContent = 'Erreur ou numéro existant.'; return; }
   msg.style.color = 'green';
   msg.textContent = 'Compte créé !';
@@ -439,12 +447,16 @@ async function ajouterClient() {
   const nomInput = document.getElementById('client-nom');
   const telInput = document.getElementById('client-tel');
   const msg = document.getElementById('client-msg');
+  const btn = document.getElementById('btn-add-client');
   if (!nomInput) return;
   
   const nom = nomInput.value.trim();
   const tel = telInput ? telInput.value.trim() : '';
   
   if (!nom) { msg.textContent = 'Entrez un nom.'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Enregistrement...';
 
   const nouveauClient = { id: 'temp_' + Date.now(), nom, telephone: tel, vendeur_id: vendeurId };
 
@@ -459,6 +471,9 @@ async function ajouterClient() {
     queue.push({ type: 'client', data: nouveauClient });
     localStorage.setItem('sync_queue', JSON.stringify(queue));
   }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Enregistrer';
 
   nomInput.value = '';
   if (telInput) telInput.value = '';
@@ -535,9 +550,22 @@ function ouvrirOperation(type) {
 
 async function supprimerClient() {
   if (!confirm('Supprimer ce client ?')) return;
+  
+  const btnSuppr = document.querySelector('#page-detail > .btn-red');
+
   if (navigator.onLine) {
+    if (btnSuppr) {
+      btnSuppr.disabled = true;
+      btnSuppr.innerHTML = '<span class="spinner"></span>Suppression en cours...';
+    }
+
     await sb.from('operations').delete().eq('client_id', clientActuel.id);
     await sb.from('clients').delete().eq('id', clientActuel.id);
+
+    if (btnSuppr) {
+      btnSuppr.disabled = false;
+      btnSuppr.innerHTML = '🗑️ Supprimer';
+    }
   } else {
     alert("La suppression nécessite une connexion internet.");
     return;
@@ -555,12 +583,16 @@ async function enregistrerOperation() {
   const montantInput = document.getElementById('op-montant');
   const noteInput = document.getElementById('op-note');
   const msg = document.getElementById('op-msg');
+  const btn = document.getElementById('btn-valider-op');
   if (!montantInput) return;
 
   const montant = parseFloat(montantInput.value);
   const note = noteInput ? noteInput.value.trim() : '';
   
   if (!(montant > 0)) { msg.textContent = 'Montant invalide.'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Validation...';
 
   const nouvelleOp = { client_id: clientActuel.id, type: typeOp, montant, note, devise: deviseChoisie, created_at: new Date().toISOString() };
 
@@ -575,6 +607,9 @@ async function enregistrerOperation() {
     queue.push({ type: 'operation', data: nouvelleOp });
     localStorage.setItem('sync_queue', JSON.stringify(queue));
   }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Valider';
 
   fermerOperation();
   await chargerClients();
