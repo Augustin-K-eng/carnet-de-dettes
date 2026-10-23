@@ -89,6 +89,18 @@ button:disabled{opacity:0.7;cursor:not-allowed}
   </div>
 </div>
 
+<!-- MODAL CONFIRMATION SUPPRESSION CLIENT -->
+<div id="modal-confirm" class="modal">
+  <div class="modal-box" style="text-align: center;">
+    <h2 style="color:#c0392b; margin-top:0;">⚠️ Confirmation</h2>
+    <p style="font-size: 16px; color: #333; margin-bottom: 20px;">Voulez-vous vraiment supprimer ce client ?</p>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+      <button class="btn-gray" onclick="fermerModalConfirm()">Annuler</button>
+      <button class="btn-red" id="btn-confirm-suppr" onclick="confirmerSuppressionClient()">Oui, supprimer</button>
+    </div>
+  </div>
+</div>
+
 <!-- PAGE CONNEXION -->
 <div id="page-login" class="page active">
   <div class="bg-drapeau"></div>
@@ -548,28 +560,39 @@ function ouvrirOperation(type) {
   if (btnValider) btnValider.className = type === 'dette' ? 'btn-red' : 'btn-green';
 }
 
-async function supprimerClient() {
-  if (!confirm('Supprimer ce client ?')) return;
-  
-  const btnSuppr = document.querySelector('#page-detail > .btn-red');
+function supprimerClient() {
+  const modal = document.getElementById('modal-confirm');
+  if (modal) modal.classList.add('active');
+}
+
+function fermerModalConfirm() {
+  const modal = document.getElementById('modal-confirm');
+  if (modal) modal.classList.remove('active');
+}
+
+async function confirmerSuppressionClient() {
+  const btn = document.getElementById('btn-confirm-suppr');
 
   if (navigator.onLine) {
-    if (btnSuppr) {
-      btnSuppr.disabled = true;
-      btnSuppr.innerHTML = '<span class="spinner"></span>Suppression en cours...';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Suppression...';
     }
 
     await sb.from('operations').delete().eq('client_id', clientActuel.id);
     await sb.from('clients').delete().eq('id', clientActuel.id);
 
-    if (btnSuppr) {
-      btnSuppr.disabled = false;
-      btnSuppr.innerHTML = '🗑️ Supprimer';
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = 'Oui, supprimer';
     }
   } else {
     alert("La suppression nécessite une connexion internet.");
+    fermerModalConfirm();
     return;
   }
+
+  fermerModalConfirm();
   await chargerClients();
   afficher('page-clients');
 }
