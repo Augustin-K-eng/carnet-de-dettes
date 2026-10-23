@@ -1,44 +1,56 @@
-const CACHE_NAME = 'carnet-v1';
-const FILES = [
+const CACHE_NAME = 'carnet-dettes-v2';
+const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
-  './icon.svg',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  'https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg'
+  './icon.svg'
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(c => c.addAll(FILES))
+// Installation : mise en cache des nouveaux fichiers
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
   );
+  // Forcer le nouveau Service Worker à devenir actif immédiatement
   self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.map(key => {
-        if (key !== CACHE_NAME) return caches.delete(key);
-      })
-    ))
+// Activation : suppression des anciens caches (ex: v1)
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
+          }
+        })
+      );
+    })
   );
+  // Prendre le contrôle immédiat de toutes les pages ouvertes
   self.clients.claim();
 });
 
-self.addEventListener('fetch', e => {
-  if (e.request.url.includes('supabase.co')) {
-    e.respondWith(
-      fetch(e.request).catch(() => {
-        return new Response(JSON.stringify({ error: 'Hors ligne' }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
+// Interception des requêtes : stratégie Network-First pour toujours charger le code le plus récent si connecté
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    fetch(event.request)
+      .then((networkResponse) => {
+        // Si le réseau fonctionne, on met à jour le cache et on renvoie la réponse fraîche
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
       })
-    );
-    return;
-  }
-
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+      .catch(() => {
+        // En cas de panne de réseau / hors ligne, on utilise le cache
+        return caches.match(event.request);
+      })
   );
 });
