@@ -345,7 +345,6 @@ async function ouvrirAdminPrompt() {
     if (navigator.onLine) {
       const res = await sb.from('vendeurs').select('*').order('created_at', { ascending: false });
       data = res.data || [];
-      localStorage.setItem('cache_vendeurs_admin', JSON.stringify(data));
     } else {
       const local = localStorage.getItem('cache_vendeurs_admin');
       if (local) data = JSON.parse(local);
@@ -454,11 +453,9 @@ async function chargerClients() {
   let clientsData = [];
 
   if (navigator.onLine) {
+    // Requête directe sans cache
     const { data } = await sb.from('clients').select('*').eq('vendeur_id', vendeurId).order('created_at', { ascending: false });
-    if (data) {
-      clientsData = data;
-      localStorage.setItem('cache_clients_' + vendeurId, JSON.stringify(data));
-    }
+    if (data) clientsData = data;
   } else {
     const local = localStorage.getItem('cache_clients_' + vendeurId);
     if (local) clientsData = JSON.parse(local);
@@ -472,7 +469,7 @@ async function chargerClients() {
   let totalUSD = 0;
 
   for (const c of clientsData || []) {
-    const bal = await calculerSolde(c.id, true); // Forcer recalcul direct
+    const bal = await calculerSolde(c.id);
     totalFC += Math.max(0, bal.fc);
     totalUSD += Math.max(0, bal.usd);
 
@@ -497,14 +494,12 @@ async function chargerClients() {
   if (elUsd) elUsd.textContent = totalUSD.toLocaleString() + ' $';
 }
 
-async function calculerSolde(clientId, forcerFresh = false) {
+async function calculerSolde(clientId) {
   let ops = [];
   if (navigator.onLine) {
+    // Toujours récupérer les opérations fraîches depuis Supabase en temps réel
     const { data } = await sb.from('operations').select('type,montant,devise').eq('client_id', clientId);
-    if (data) {
-      ops = data;
-      localStorage.setItem('cache_ops_' + clientId, JSON.stringify(data));
-    }
+    if (data) ops = data;
   } else {
     const local = localStorage.getItem('cache_ops_' + clientId);
     if (local) ops = JSON.parse(local);
@@ -605,7 +600,7 @@ async function ouvrirClient(c) {
   const detailNom = document.getElementById('detail-nom');
   if (detailNom) detailNom.textContent = c.nom;
   
-  const bal = await calculerSolde(c.id, true);
+  const bal = await calculerSolde(c.id);
   const dt = document.getElementById('detail-total');
   const aDesDettes = bal.fc > 0 || bal.usd > 0;
   if (dt) {
@@ -626,10 +621,7 @@ async function chargerOperations(clientId) {
   let ops = [];
   if (navigator.onLine) {
     const { data } = await sb.from('operations').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
-    if (data) {
-      ops = data;
-      localStorage.setItem('cache_ops_' + clientId, JSON.stringify(data));
-    }
+    if (data) ops = data;
   } else {
     const local = localStorage.getItem('cache_ops_' + clientId);
     if (local) ops = JSON.parse(local);
@@ -648,7 +640,7 @@ async function chargerOperations(clientId) {
   });
 }
 
-// MISE À JOUR DYNAMIQUE EN DIRECT LORS DU CLIC SUR DEUX BOUTONS (+ DETTE OU − PAIEMENT)
+// GESTION INSTANTANÉE DES BOUTONS LORS DU CLIC SUR PAIEMENT OU DETTE
 async function ouvrirOperation(type) {
   typeOp = type;
   
@@ -659,8 +651,8 @@ async function ouvrirOperation(type) {
   if (btnUsd) btnUsd.classList.remove('disabled-devise');
 
   if (type === 'paiement') {
-    // Recalcul strict en direct à chaque ouverture
-    const bal = await calculerSolde(clientActuel.id, true);
+    // Interrogation directe de Supabase pour obtenir le solde instantané à la milliseconde
+    const bal = await calculerSolde(clientActuel.id);
     let aFC = bal.fc > 0;
     let aUSD = bal.usd > 0;
 
@@ -767,9 +759,7 @@ async function enregistrerOperation() {
   btn.innerHTML = 'Valider';
 
   fermerOperation();
-
-  // Nettoyage immédiat pour forcer la mise à jour sans rechargement de la page
-  localStorage.removeItem('cache_ops_' + clientActuel.id);
+  // Mise à jour instantanée de la fiche client en direct
   await ouvrirClient(clientActuel);
 }
 
