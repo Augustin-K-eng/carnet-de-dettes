@@ -234,7 +234,7 @@ button:disabled{opacity:0.7;cursor:not-allowed}
     <button class="btn-green" onclick="ouvrirOperation('paiement')">− Paiement</button>
   </div>
   
-  <!-- FORMULAIRE CACHÉ PAR DÉFAUT : APPARAÎT UNIQUEMENT AU CLIC SUR + DETTE OU − PAIEMENT -->
+  <!-- FORMULAIRE CACHÉ PAR DÉFAUT -->
   <div id="form-operation" style="display:none">
     <div class="card">
       <div style="margin-bottom:10px">
@@ -268,6 +268,24 @@ let typeOp = null;
 let deviseChoisie = 'FC';
 let deviseNouveauClient = 'FC';
 let deferredPrompt = null;
+
+// Fonction pour jouer un son d'erreur (bip sonore synthétisé)
+function jouerSonErreur() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 300; 
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.2);
+  } catch (e) {
+    console.log("Audio non supporté", e);
+  }
+}
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -515,6 +533,7 @@ async function calculerSolde(clientId) {
   return { fc, usd };
 }
 
+// VALIDATION : "Entrez le nom" et/ou "Entrez le montant" avec sons
 async function ajouterClient() {
   const nomInput = document.getElementById('client-nom');
   const telInput = document.getElementById('client-tel');
@@ -526,10 +545,32 @@ async function ajouterClient() {
   
   const nom = nomInput.value.trim();
   const tel = telInput ? telInput.value.trim() : '';
-  const montantDette = montantInput ? parseFloat(montantInput.value) : 0;
+  const montantDette = montantInput ? montantInput.value.trim() : '';
   const noteDette = noteInput ? noteInput.value.trim() : '';
   
-  if (!nom) { msg.textContent = 'Entrez un nom.'; return; }
+  // Condition 1 : Nom vide
+  if (!nom) { 
+    msg.textContent = 'Entrez le nom'; 
+    jouerSonErreur();
+    nomInput.focus();
+    return; 
+  }
+
+  // Condition 2 : Montant vide alors qu'on essaie de mettre une dette ou un montant
+  if (montantDette === '') {
+    msg.textContent = 'Entrez le montant';
+    jouerSonErreur();
+    montantInput.focus();
+    return;
+  }
+
+  const montantNum = parseFloat(montantDette) || 0;
+  if (!(montantNum > 0)) {
+    msg.textContent = 'Montant invalide';
+    jouerSonErreur();
+    montantInput.focus();
+    return;
+  }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Enregistrement...';
@@ -541,14 +582,15 @@ async function ajouterClient() {
       msg.textContent = "Erreur lors de la création du client.";
       btn.disabled = false;
       btn.innerHTML = 'Enregistrer';
+      jouerSonErreur();
       return;
     }
 
-    if (montantDette > 0) {
+    if (montantNum > 0) {
       await sb.from('operations').insert([{
         client_id: data.id,
         type: 'dette',
-        montant: montantDette,
+        montant: montantNum,
         note: noteDette || 'Dette initiale',
         devise: deviseNouveauClient,
         created_at: new Date().toISOString()
@@ -565,11 +607,11 @@ async function ajouterClient() {
     let queue = JSON.parse(localStorage.getItem('sync_queue') || '[]');
     queue.push({ type: 'client', data: nouveauClient });
 
-    if (montantDette > 0) {
+    if (montantNum > 0) {
       const nouvelleOp = {
         client_id: tempId,
         type: 'dette',
-        montant: montantDette,
+        montant: montantNum,
         note: noteDette || 'Dette initiale',
         devise: deviseNouveauClient,
         created_at: new Date().toISOString()
@@ -599,7 +641,7 @@ async function ajouterClient() {
 
 async function ouvrirClient(c) {
   clientActuel = c;
-  fermerOperation(); // Cacher le formulaire si ouvert
+  fermerOperation();
   const detailNom = document.getElementById('detail-nom');
   if (detailNom) detailNom.textContent = c.nom;
   
@@ -643,7 +685,6 @@ async function chargerOperations(clientId) {
   });
 }
 
-// LES DEVISES N'APPARAISSENT QU'À L'OUVERTURE DU FORMULAIRE APRÈS CLIC
 async function ouvrirOperation(type) {
   typeOp = type;
   
@@ -682,7 +723,7 @@ async function ouvrirOperation(type) {
   if (opMontant) opMontant.value = '';
   if (opNote) opNote.value = '';
   if (opMsg) opMsg.textContent = '';
-  if (formOp) formOp.style.display = 'block'; // Apparition ici uniquement
+  if (formOp) formOp.style.display = 'block';
   if (btnValider) btnValider.className = type === 'dette' ? 'btn-red' : 'btn-green';
 }
 
@@ -738,7 +779,11 @@ async function enregistrerOperation() {
   const montant = parseFloat(montantInput.value);
   const note = noteInput ? noteInput.value.trim() : '';
   
-  if (!(montant > 0)) { msg.textContent = 'Montant invalide.'; return; }
+  if (!(montant > 0)) { 
+    msg.textContent = 'Montant invalide.'; 
+    jouerSonErreur();
+    return; 
+  }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Validation...';
