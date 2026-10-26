@@ -264,6 +264,7 @@ button:disabled{opacity:0.7;cursor:not-allowed}
   <button class="btn-red" style="margin-top:20px" onclick="supprimerClient()">🗑️ Supprimer</button>
   <h3>Historique</h3>
   <div id="liste-operations"></div>
+  <button id="btn-voir-tout-hist" class="btn-gray btn-small-text" style="display:none; margin-top:10px;" onclick="chargerOperations(clientActuel.id, true)">📜 Voir tout l'historique</button>
 </div>
 
 <script>
@@ -672,11 +673,12 @@ async function ouvrirClient(c) {
     
     dt.innerHTML = `<small>${aDesDettes ? 'Doit encore' : 'Rien à payer'}</small><b>${texte}</b>`;
   }
-  await chargerOperations(c.id);
+  await chargerOperations(c.id, false);
   afficher('page-detail');
 }
 
-async function chargerOperations(clientId) {
+// AFFICHAGE DE L'HISTORIQUE : DÉFAUT 10 OPÉRATIONS, OU TOUT SI afficherTout EST TRUE
+async function chargerOperations(clientId, afficherTout = false) {
   let ops = [];
   if (navigator.onLine) {
     const { data } = await sb.from('operations').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
@@ -687,16 +689,35 @@ async function chargerOperations(clientId) {
   }
 
   const liste = document.getElementById('liste-operations');
+  const btnVoirTout = document.getElementById('btn-voir-tout-hist');
   if (!liste) return;
   liste.innerHTML = '';
-  if (!ops || !ops.length) { liste.innerHTML = '<p style="color:#999">Aucune opération.</p>'; return; }
-  ops.forEach(x => {
+
+  if (!ops || !ops.length) { 
+    liste.innerHTML = '<p style="color:#999">Aucune opération.</p>'; 
+    if (btnVoirTout) btnVoirTout.style.display = 'none';
+    return; 
+  }
+
+  const totalOps = ops.length;
+  const opsAffichees = afficherTout ? ops : ops.slice(0, 10);
+
+  opsAffichees.forEach(x => {
     const div = document.createElement('div');
     div.className = 'card';
     const devise = x.devise || 'FC';
     div.innerHTML = `<div style="display:flex;justify-content:space-between"><div>${x.type === 'dette' ? '📌 Dette' : '✅ Paiement'}<div style="font-size:13px;color:#888">${new Date(x.created_at || Date.now()).toLocaleDateString('fr-FR')}${x.note ? ' · ' + x.note : ''}</div></div><span class="${x.type === 'dette' ? 'owe' : 'ok'}">${x.type === 'dette' ? '+' : '−'}${Number(x.montant).toLocaleString()} ${devise}</span></div>`;
     liste.appendChild(div);
   });
+
+  if (btnVoirTout) {
+    if (!afficherTout && totalOps > 10) {
+      btnVoirTout.style.display = 'block';
+      btnVoirTout.textContent = `📜 Voir tout l'historique (${totalOps} opérations)`;
+    } else {
+      btnVoirTout.style.display = 'none';
+    }
+  }
 }
 
 async function ouvrirOperation(type) {
