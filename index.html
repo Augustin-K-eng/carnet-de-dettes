@@ -844,3 +844,28 @@ async function synchroniserFileAttente() {
     if (item.type === 'client') {
       await sb.from('clients').insert([{ nom: item.data.nom, telephone: item.data.telephone, vendeur_id: item.data.vendeur_id }]);
     } else if (item.type === 'operation') {
+      await sb.from('operations').insert([item.data]);
+    }
+  }
+
+  localStorage.removeItem('sync_queue');
+}
+
+window.onload = async () => {
+  if (!navigator.onLine) {
+    const banner = document.getElementById('offline-banner');
+    if (banner) banner.style.display = 'block';
+  } else {
+    await synchroniserFileAttente();
+  }
+
+  const id = localStorage.getItem('vendeur_id');
+  if (id) { 
+    vendeurId = id; 
+    await chargerClients(); 
+    afficher('page-clients'); 
+  }
+};
+</script>
+</body>
+</html>
