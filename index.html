@@ -199,7 +199,7 @@ button:disabled{opacity:0.7;cursor:not-allowed}
   <div id="liste-clients"></div>
 </div>
 
-<!-- PAGE NOUVEAU CLIENT AVEC CHAMP DETTE ET DEVISE -->
+<!-- PAGE NOUVEAU CLIENT -->
 <div id="page-nouveau-client" class="page">
   <h1>Nouveau client</h1>
   <input id="client-nom" placeholder="Nom du client">
@@ -528,7 +528,6 @@ async function ajouterClient() {
   btn.innerHTML = '<span class="spinner"></span>Enregistrement...';
 
   if (navigator.onLine) {
-    // 1. Créer le client
     const { data, error } = await sb.from('clients').insert([{ nom, telephone: tel, vendeur_id: vendeurId }]).select().single();
     
     if (error || !data) {
@@ -538,7 +537,6 @@ async function ajouterClient() {
       return;
     }
 
-    // 2. Si un montant de dette est renseigné, créer l'opération
     if (montantDette > 0) {
       await sb.from('operations').insert([{
         client_id: data.id,
@@ -550,7 +548,6 @@ async function ajouterClient() {
       }]);
     }
   } else {
-    // Mode Hors ligne
     const tempId = 'temp_' + Date.now();
     const nouveauClient = { id: tempId, nom, telephone: tel, vendeur_id: vendeurId };
 
@@ -641,10 +638,32 @@ async function chargerOperations(clientId) {
   });
 }
 
-function ouvrirOperation(type) {
+// GESTION INTELLIGENTE DU PAIEMENT SELON LA DETTE DU CLIENT
+async function ouvrirOperation(type) {
   typeOp = type;
-  deviseChoisie = 'FC';
-  choisirDevise('FC');
+  
+  if (type === 'paiement') {
+    const bal = await calculerSolde(clientActuel.id);
+    let aFC = bal.fc > 0;
+    let aUSD = bal.usd > 0;
+
+    // Si le client a uniquement une dette en FC -> sélection automatique en FC
+    if (aFC && !aUSD) {
+      choisirDevise('FC');
+    } 
+    // Si le client a uniquement une dette en Dollars -> sélection automatique en $
+    else if (aUSD && !aFC) {
+      choisirDevise('$');
+    } 
+    // S'il a des dettes dans les deux devises (ou aucune) -> on garde la dernière sélection ou FC par défaut, et le vendeur choisit manuellement
+    else if (!aFC && !aUSD) {
+      choisirDevise('FC');
+    }
+    // Si aFC et aUSD sont tous les deux vrais (les deux dettes en cours), on ne force rien, on laisse le choix libre au vendeur !
+  } else {
+    choisirDevise('FC');
+  }
+
   const opMontant = document.getElementById('op-montant');
   const opNote = document.getElementById('op-note');
   const opMsg = document.getElementById('op-msg');
