@@ -52,6 +52,8 @@ button:disabled{opacity:0.7;cursor:not-allowed}
 .modal-box h2{margin-top:0;color:#1f7a4d}
 .devise-btn{display:inline-block;padding:10px 20px;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;border:2px solid #ccc;background:#fff;margin:4px;}
 .devise-btn.selected{border-color:#1f7a4d;background:#1f7a4d;color:#fff;}
+/* Style pour barrer/griser un bouton de devise non concerné */
+.devise-btn.disabled-devise{opacity:0.3;text-decoration:line-through;cursor:not-allowed;background:#e0e0e0;border-color:#ccc;color:#888;}
 
 #offline-banner {
   display: none;
@@ -236,7 +238,7 @@ button:disabled{opacity:0.7;cursor:not-allowed}
     <div class="card">
       <div style="margin-bottom:10px">
         <b>Devise :</b><br>
-        <span class="devise-btn selected" id="btn-fc" onclick="choisirDevise('FC')">FC</span>
+        <span class="devise-btn" id="btn-fc" onclick="choisirDevise('FC')">FC</span>
         <span class="devise-btn" id="btn-usd" onclick="choisirDevise('$')">$</span>
       </div>
       <input id="op-montant" type="number" placeholder="Montant">
@@ -313,9 +315,14 @@ function fermerAide() {
 }
 
 function choisirDevise(d) {
-  deviseChoisie = d;
+  // Empêcher de choisir une devise barrée/désactivée lors d'un paiement unique
   const btnFc = document.getElementById('btn-fc');
   const btnUsd = document.getElementById('btn-usd');
+  
+  if (d === 'FC' && btnFc.classList.contains('disabled-devise')) return;
+  if (d === '$' && btnUsd.classList.contains('disabled-devise')) return;
+
+  deviseChoisie = d;
   if (btnFc) btnFc.classList.toggle('selected', d === 'FC');
   if (btnUsd) btnUsd.classList.toggle('selected', d === '$');
 }
@@ -638,29 +645,38 @@ async function chargerOperations(clientId) {
   });
 }
 
-// GESTION INTELLIGENTE DU PAIEMENT SELON LA DETTE DU CLIENT
+// GESTION INTELLIGENTE DU PAIEMENT AVEC BARRAGE DES DEVISES NON CONCERNÉES
 async function ouvrirOperation(type) {
   typeOp = type;
   
+  const btnFc = document.getElementById('btn-fc');
+  const btnUsd = document.getElementById('btn-usd');
+
+  // Remettre les boutons à l'état normal par défaut
+  if (btnFc) btnFc.classList.remove('disabled-devise');
+  if (btnUsd) btnUsd.classList.remove('disabled-devise');
+
   if (type === 'paiement') {
     const bal = await calculerSolde(clientActuel.id);
     let aFC = bal.fc > 0;
     let aUSD = bal.usd > 0;
 
-    // Si le client a uniquement une dette en FC -> sélection automatique en FC
+    // Si le client a uniquement une dette en FC -> sélection automatique FC et on barre le $
     if (aFC && !aUSD) {
       choisirDevise('FC');
+      if (btnUsd) btnUsd.classList.add('disabled-devise');
     } 
-    // Si le client a uniquement une dette en Dollars -> sélection automatique en $
+    // Si le client a uniquement une dette en $ -> sélection automatique $ et on barre le FC
     else if (aUSD && !aFC) {
       choisirDevise('$');
+      if (btnFc) btnFc.classList.add('disabled-devise');
     } 
-    // S'il a des dettes dans les deux devises (ou aucune) -> on garde la dernière sélection ou FC par défaut, et le vendeur choisit manuellement
-    else if (!aFC && !aUSD) {
-      choisirDevise('FC');
+    // Si le client a les deux dettes (FC et $) -> aucun barrage, le vendeur choisit manuellement
+    else {
+      choisirDevise('FC'); // par défaut au cas où
     }
-    // Si aFC et aUSD sont tous les deux vrais (les deux dettes en cours), on ne force rien, on laisse le choix libre au vendeur !
   } else {
+    // Pour une nouvelle dette, tout est ouvert normalement
     choisirDevise('FC');
   }
 
