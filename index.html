@@ -226,7 +226,7 @@ button:disabled{opacity:0.7;cursor:not-allowed}
 <div id="page-detail" class="page">
   <div style="display:flex;justify-content:space-between;align-items:center">
     <h1 id="detail-nom">Client</h1>
-    <button onclick="afficher('page-clients')" style="width:auto;padding:8px 12px;background:#eee;border:none;border-radius:8px;cursor:pointer">Retour</button>
+    <button onclick="retourAuxClients()" style="width:auto;padding:8px 12px;background:#eee;border:none;border-radius:8px;cursor:pointer">Retour</button>
   </div>
   <div id="detail-total" class="total"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
@@ -301,6 +301,11 @@ function afficher(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const target = document.getElementById(pageId);
   if (target) target.classList.add('active');
+}
+
+async function retourAuxClients() {
+  await chargerClients();
+  afficher('page-clients');
 }
 
 function ouvrirAide() { 
@@ -467,7 +472,7 @@ async function chargerClients() {
   let totalUSD = 0;
 
   for (const c of clientsData || []) {
-    const bal = await calculerSolde(c.id);
+    const bal = await calculerSolde(c.id, true); // Forcer recalcul direct
     totalFC += Math.max(0, bal.fc);
     totalUSD += Math.max(0, bal.usd);
 
@@ -492,7 +497,7 @@ async function chargerClients() {
   if (elUsd) elUsd.textContent = totalUSD.toLocaleString() + ' $';
 }
 
-async function calculerSolde(clientId) {
+async function calculerSolde(clientId, forcerFresh = false) {
   let ops = [];
   if (navigator.onLine) {
     const { data } = await sb.from('operations').select('type,montant,devise').eq('client_id', clientId);
@@ -507,7 +512,7 @@ async function calculerSolde(clientId) {
 
   let fc = 0, usd = 0;
   (ops || []).forEach(x => {
-    const v = x.type === 'dette' ? x.montant : -x.montant;
+    const v = x.type === 'dette' ? Number(x.montant) : -Number(x.montant);
     if (x.devise === '$') usd += v; else fc += v;
   });
   return { fc, usd };
@@ -600,7 +605,7 @@ async function ouvrirClient(c) {
   const detailNom = document.getElementById('detail-nom');
   if (detailNom) detailNom.textContent = c.nom;
   
-  const bal = await calculerSolde(c.id);
+  const bal = await calculerSolde(c.id, true);
   const dt = document.getElementById('detail-total');
   const aDesDettes = bal.fc > 0 || bal.usd > 0;
   if (dt) {
@@ -643,36 +648,32 @@ async function chargerOperations(clientId) {
   });
 }
 
-// CORRECTION : RAFRAÎCHISSEMENT INSTANTANÉ DES DONNÉES AVANT DE VÉRIFIER LES DEVISES
+// MISE À JOUR DYNAMIQUE EN DIRECT LORS DU CLIC SUR DEUX BOUTONS (+ DETTE OU − PAIEMENT)
 async function ouvrirOperation(type) {
   typeOp = type;
   
   const btnFc = document.getElementById('btn-fc');
   const btnUsd = document.getElementById('btn-usd');
 
-  // Remettre les boutons actifs par défaut
   if (btnFc) btnFc.classList.remove('disabled-devise');
   if (btnUsd) btnUsd.classList.remove('disabled-devise');
 
   if (type === 'paiement') {
-    // Forcer un recalcul immédiat basé sur les données fraîches
-    const bal = await calculerSolde(clientActuel.id);
+    // Recalcul strict en direct à chaque ouverture
+    const bal = await calculerSolde(clientActuel.id, true);
     let aFC = bal.fc > 0;
     let aUSD = bal.usd > 0;
 
-    // Si uniquement dette en FC -> sélectionne FC et barre le $
     if (aFC && !aUSD) {
       choisirDevise('FC');
       if (btnUsd) btnUsd.classList.add('disabled-devise');
     } 
-    // Si uniquement dette en $ -> sélectionne $ et barre le FC
     else if (aUSD && !aFC) {
       choisirDevise('$');
       if (btnFc) btnFc.classList.add('disabled-devise');
     } 
-    // Si le client a les DEUX dettes (FC et $) -> ON NE BARRE RIEN, les deux sont cliquables !
     else {
-      choisirDevise('FC'); 
+      choisirDevise('FC');
     }
   } else {
     choisirDevise('FC');
@@ -766,8 +767,9 @@ async function enregistrerOperation() {
   btn.innerHTML = 'Valider';
 
   fermerOperation();
-  
-  // MISE À JOUR INSTANTANÉMENT DE L'INTERFACE SANS RAFRAÎCHIR LA PAGE
+
+  // Nettoyage immédiat pour forcer la mise à jour sans rechargement de la page
+  localStorage.removeItem('cache_ops_' + clientActuel.id);
   await ouvrirClient(clientActuel);
 }
 
