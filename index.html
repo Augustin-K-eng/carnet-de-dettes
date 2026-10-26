@@ -116,7 +116,6 @@ button:disabled{opacity:0.7;cursor:not-allowed}
   <div class="bg-drapeau"></div>
   
   <div class="contenu">
-    <!-- MARGE SUPÉRIEURE AU-DESSUS DU TITRE -->
     <h1 style="font-size: 28px; margin-top: 40px; margin-bottom: 40px;">📒 Carnet de dettes <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg" style="height:34px;vertical-align:middle;border-radius:4px;margin-left:6px"></h1>
     <p style="margin-top: 0; margin-bottom: 16px; font-size: 15px;">Connectez-vous avec votre numéro et votre PIN</p>
     <input id="login-tel" type="tel" placeholder="Numéro de téléphone">
@@ -134,7 +133,7 @@ button:disabled{opacity:0.7;cursor:not-allowed}
       <button class="btn-purple btn-small-text" onclick="ouvrirAdminPrompt()">🔒 Admin</button>
     </div>
 
-    <!-- BLOC CONTACT AVEC MARGE AUGMENTÉE AU-DESSUS (100PX) -->
+    <!-- BLOC CONTACT -->
     <div style="margin-top: 100px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.1); text-align: center; font-size: 13px; color: #333;">
       <p style="margin: 4px 0;">
         <a href="https://wa.me/243998428385" target="_blank" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: #1f7a4d; text-decoration: none; font-weight: bold;">
@@ -150,7 +149,7 @@ button:disabled{opacity:0.7;cursor:not-allowed}
       </p>
 
       <p style="margin: 4px 0; font-weight: bold; color: #1f7a4d;">
-        DRC/Kinshasa
+        DRC
       </p>
     </div>
 
@@ -200,11 +199,23 @@ button:disabled{opacity:0.7;cursor:not-allowed}
   <div id="liste-clients"></div>
 </div>
 
-<!-- PAGE NOUVEAU CLIENT -->
+<!-- PAGE NOUVEAU CLIENT AVEC CHAMP DETTE ET DEVISE -->
 <div id="page-nouveau-client" class="page">
   <h1>Nouveau client</h1>
   <input id="client-nom" placeholder="Nom du client">
   <input id="client-tel" type="tel" placeholder="Téléphone (facultatif)">
+  
+  <div class="card" style="margin-top: 12px;">
+    <h3 style="margin-top:0; font-size:16px; color:#c0392b;">📌 Première dette (facultative)</h3>
+    <div style="margin-bottom:10px">
+      <b>Devise :</b><br>
+      <span class="devise-btn selected" id="new-client-btn-fc" onclick="choisirDeviseNouveauClient('FC')">FC</span>
+      <span class="devise-btn" id="new-client-btn-usd" onclick="choisirDeviseNouveauClient('$')">$</span>
+    </div>
+    <input id="client-dette-montant" type="number" placeholder="Montant de la dette">
+    <input id="client-dette-note" placeholder="Note (ex: marchandises, crédit...)">
+  </div>
+
   <div id="client-msg" class="msg"></div>
   <button id="btn-add-client" class="btn-green" onclick="ajouterClient()">Enregistrer</button>
   <button class="btn-gray" onclick="afficher('page-clients')">Annuler</button>
@@ -251,6 +262,7 @@ let vendeurId = null;
 let clientActuel = null;
 let typeOp = null;
 let deviseChoisie = 'FC';
+let deviseNouveauClient = 'FC';
 let deferredPrompt = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -304,6 +316,14 @@ function choisirDevise(d) {
   deviseChoisie = d;
   const btnFc = document.getElementById('btn-fc');
   const btnUsd = document.getElementById('btn-usd');
+  if (btnFc) btnFc.classList.toggle('selected', d === 'FC');
+  if (btnUsd) btnUsd.classList.toggle('selected', d === '$');
+}
+
+function choisirDeviseNouveauClient(d) {
+  deviseNouveauClient = d;
+  const btnFc = document.getElementById('new-client-btn-fc');
+  const btnUsd = document.getElementById('new-client-btn-usd');
   if (btnFc) btnFc.classList.toggle('selected', d === 'FC');
   if (btnUsd) btnUsd.classList.toggle('selected', d === '$');
 }
@@ -491,29 +511,72 @@ async function calculerSolde(clientId) {
 async function ajouterClient() {
   const nomInput = document.getElementById('client-nom');
   const telInput = document.getElementById('client-tel');
+  const montantInput = document.getElementById('client-dette-montant');
+  const noteInput = document.getElementById('client-dette-note');
   const msg = document.getElementById('client-msg');
   const btn = document.getElementById('btn-add-client');
   if (!nomInput) return;
   
   const nom = nomInput.value.trim();
   const tel = telInput ? telInput.value.trim() : '';
+  const montantDette = montantInput ? parseFloat(montantInput.value) : 0;
+  const noteDette = noteInput ? noteInput.value.trim() : '';
   
   if (!nom) { msg.textContent = 'Entrez un nom.'; return; }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Enregistrement...';
 
-  const nouveauClient = { id: 'temp_' + Date.now(), nom, telephone: tel, vendeur_id: vendeurId };
-
   if (navigator.onLine) {
-    await sb.from('clients').insert([{ nom, telephone: tel, vendeur_id: vendeurId }]);
+    // 1. Créer le client
+    const { data, error } = await sb.from('clients').insert([{ nom, telephone: tel, vendeur_id: vendeurId }]).select().single();
+    
+    if (error || !data) {
+      msg.textContent = "Erreur lors de la création du client.";
+      btn.disabled = false;
+      btn.innerHTML = 'Enregistrer';
+      return;
+    }
+
+    // 2. Si un montant de dette est renseigné, créer l'opération
+    if (montantDette > 0) {
+      await sb.from('operations').insert([{
+        client_id: data.id,
+        type: 'dette',
+        montant: montantDette,
+        note: noteDette || 'Dette initiale',
+        devise: deviseNouveauClient,
+        created_at: new Date().toISOString()
+      }]);
+    }
   } else {
+    // Mode Hors ligne
+    const tempId = 'temp_' + Date.now();
+    const nouveauClient = { id: tempId, nom, telephone: tel, vendeur_id: vendeurId };
+
     let localClients = JSON.parse(localStorage.getItem('cache_clients_' + vendeurId) || '[]');
     localClients.unshift(nouveauClient);
     localStorage.setItem('cache_clients_' + vendeurId, JSON.stringify(localClients));
-    
+
     let queue = JSON.parse(localStorage.getItem('sync_queue') || '[]');
     queue.push({ type: 'client', data: nouveauClient });
+
+    if (montantDette > 0) {
+      const nouvelleOp = {
+        client_id: tempId,
+        type: 'dette',
+        montant: montantDette,
+        note: noteDette || 'Dette initiale',
+        devise: deviseNouveauClient,
+        created_at: new Date().toISOString()
+      };
+      let localOps = JSON.parse(localStorage.getItem('cache_ops_' + tempId) || '[]');
+      localOps.unshift(nouvelleOp);
+      localStorage.setItem('cache_ops_' + tempId, JSON.stringify(localOps));
+
+      queue.push({ type: 'operation', data: nouvelleOp });
+    }
+
     localStorage.setItem('sync_queue', JSON.stringify(queue));
   }
 
@@ -522,6 +585,8 @@ async function ajouterClient() {
 
   nomInput.value = '';
   if (telInput) telInput.value = '';
+  if (montantInput) montantInput.value = '';
+  if (noteInput) noteInput.value = '';
   msg.textContent = '';
   
   await chargerClients();
