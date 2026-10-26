@@ -233,6 +233,8 @@ button:disabled{opacity:0.7;cursor:not-allowed}
     <button class="btn-red" onclick="ouvrirOperation('dette')">+ Dette</button>
     <button class="btn-green" onclick="ouvrirOperation('paiement')">− Paiement</button>
   </div>
+  
+  <!-- FORMULAIRE CACHÉ PAR DÉFAUT : APPARAÎT UNIQUEMENT AU CLIC SUR + DETTE OU − PAIEMENT -->
   <div id="form-operation" style="display:none">
     <div class="card">
       <div style="margin-bottom:10px">
@@ -249,6 +251,7 @@ button:disabled{opacity:0.7;cursor:not-allowed}
       </div>
     </div>
   </div>
+
   <button class="btn-red" style="margin-top:20px" onclick="supprimerClient()">🗑️ Supprimer</button>
   <h3>Historique</h3>
   <div id="liste-operations"></div>
@@ -304,6 +307,7 @@ function afficher(pageId) {
 }
 
 async function retourAuxClients() {
+  fermerOperation();
   await chargerClients();
   afficher('page-clients');
 }
@@ -344,7 +348,7 @@ async function ouvrirAdminPrompt() {
     let data = [];
     if (navigator.onLine) {
       const res = await sb.from('vendeurs').select('*').order('created_at', { ascending: false });
-      data = res.data || [];
+      if (res.data) data = res.data;
     } else {
       const local = localStorage.getItem('cache_vendeurs_admin');
       if (local) data = JSON.parse(local);
@@ -453,7 +457,6 @@ async function chargerClients() {
   let clientsData = [];
 
   if (navigator.onLine) {
-    // Requête directe sans cache
     const { data } = await sb.from('clients').select('*').eq('vendeur_id', vendeurId).order('created_at', { ascending: false });
     if (data) clientsData = data;
   } else {
@@ -497,7 +500,6 @@ async function chargerClients() {
 async function calculerSolde(clientId) {
   let ops = [];
   if (navigator.onLine) {
-    // Toujours récupérer les opérations fraîches depuis Supabase en temps réel
     const { data } = await sb.from('operations').select('type,montant,devise').eq('client_id', clientId);
     if (data) ops = data;
   } else {
@@ -597,6 +599,7 @@ async function ajouterClient() {
 
 async function ouvrirClient(c) {
   clientActuel = c;
+  fermerOperation(); // Cacher le formulaire si ouvert
   const detailNom = document.getElementById('detail-nom');
   if (detailNom) detailNom.textContent = c.nom;
   
@@ -640,7 +643,7 @@ async function chargerOperations(clientId) {
   });
 }
 
-// GESTION INSTANTANÉE DES BOUTONS LORS DU CLIC SUR PAIEMENT OU DETTE
+// LES DEVISES N'APPARAISSENT QU'À L'OUVERTURE DU FORMULAIRE APRÈS CLIC
 async function ouvrirOperation(type) {
   typeOp = type;
   
@@ -651,7 +654,6 @@ async function ouvrirOperation(type) {
   if (btnUsd) btnUsd.classList.remove('disabled-devise');
 
   if (type === 'paiement') {
-    // Interrogation directe de Supabase pour obtenir le solde instantané à la milliseconde
     const bal = await calculerSolde(clientActuel.id);
     let aFC = bal.fc > 0;
     let aUSD = bal.usd > 0;
@@ -680,7 +682,7 @@ async function ouvrirOperation(type) {
   if (opMontant) opMontant.value = '';
   if (opNote) opNote.value = '';
   if (opMsg) opMsg.textContent = '';
-  if (formOp) formOp.style.display = 'block';
+  if (formOp) formOp.style.display = 'block'; // Apparition ici uniquement
   if (btnValider) btnValider.className = type === 'dette' ? 'btn-red' : 'btn-green';
 }
 
@@ -759,7 +761,6 @@ async function enregistrerOperation() {
   btn.innerHTML = 'Valider';
 
   fermerOperation();
-  // Mise à jour instantanée de la fiche client en direct
   await ouvrirClient(clientActuel);
 }
 
