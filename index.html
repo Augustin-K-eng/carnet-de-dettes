@@ -677,7 +677,7 @@ async function ouvrirClient(c) {
   afficher('page-detail');
 }
 
-// AFFICHAGE DE L'HISTORIQUE : DÉFAUT 10 OPÉRATIONS, OU TOUT SI afficherTout EST TRUE
+// AFFICHAGE DE L'HISTORIQUE : DÉFAUT 5 OPÉRATIONS, OU TOUT SI afficherTout EST TRUE
 async function chargerOperations(clientId, afficherTout = false) {
   let ops = [];
   if (navigator.onLine) {
@@ -700,7 +700,7 @@ async function chargerOperations(clientId, afficherTout = false) {
   }
 
   const totalOps = ops.length;
-  const opsAffichees = afficherTout ? ops : ops.slice(0, 10);
+  const opsAffichees = afficherTout ? ops : ops.slice(0, 5);
 
   opsAffichees.forEach(x => {
     const div = document.createElement('div');
@@ -711,7 +711,7 @@ async function chargerOperations(clientId, afficherTout = false) {
   });
 
   if (btnVoirTout) {
-    if (!afficherTout && totalOps > 10) {
+    if (!afficherTout && totalOps > 5) {
       btnVoirTout.style.display = 'block';
       btnVoirTout.textContent = `📜 Voir tout l'historique (${totalOps} opérations)`;
     } else {
