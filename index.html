@@ -419,8 +419,8 @@ async function sInscrire() {
   const msg = document.getElementById('reg-msg');
   const btn = document.getElementById('btn-reg');
   
-  if (!nom || !tel || !pin) { montrantAlerte('Remplir tous les champs.'); return; }
-  if (pin.length !== 4) { montrerAlerte('PIN 4 chiffres requis.'); return; }
+  if (!nom || !tel || !pin) { montrerAlerte('Remplir tous les champs svp.'); return; }
+  if (pin.length !== 4) { montrerAlerte('PIN 4 chiffres requis svp.'); return; }
 
   if (!navigator.onLine) {
     montrerAlerte('Impossible de créer un compte hors ligne.');
@@ -447,7 +447,7 @@ async function seConnecter() {
   const msg = document.getElementById('login-msg');
   const btn = document.getElementById('btn-login');
 
-  if (!tel || !pin) { montrerAlerte('Remplir tous les champs.'); return; }
+  if (!tel || !pin) { montrerAlerte('Remplir tous les champs svp.'); return; }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Connexion...';
@@ -556,7 +556,7 @@ async function calculerSolde(clientId) {
   return { fc, usd };
 }
 
-// VALIDATION AVEC LA FENÊTRE MODALE STYLE "SUPPRESSION" ET BOUTON OK
+// VALIDATION MISE À JOUR AVEC "svp"
 async function ajouterClient() {
   const nomInput = document.getElementById('client-nom');
   const telInput = document.getElementById('client-tel');
@@ -573,21 +573,21 @@ async function ajouterClient() {
   
   // Vérification du nom
   if (!nom) { 
-    montrerAlerte('Entrez le nom'); 
+    montrerAlerte('Entrez le nom svp'); 
     nomInput.focus();
     return; 
   }
 
   // Vérification du montant
   if (montantDette === '') {
-    montrerAlerte('Entrez le montant');
+    montrerAlerte('Entrez le montant svp');
     montantInput.focus();
     return;
   }
 
   const montantNum = parseFloat(montantDette) || 0;
   if (!(montantNum > 0)) {
-    montrerAlerte('Montant invalide');
+    montrerAlerte('Montant invalide svp');
     montantInput.focus();
     return;
   }
@@ -799,7 +799,7 @@ async function enregistrerOperation() {
   const note = noteInput ? noteInput.value.trim() : '';
   
   if (!(montant > 0)) { 
-    montrerAlerte('Montant invalide.'); 
+    montrerAlerte('Montant invalide svp.'); 
     return; 
   }
 
