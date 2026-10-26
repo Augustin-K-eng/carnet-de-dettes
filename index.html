@@ -556,7 +556,6 @@ async function calculerSolde(clientId) {
   return { fc, usd };
 }
 
-// VALIDATION MISE À JOUR AVEC "svp"
 async function ajouterClient() {
   const nomInput = document.getElementById('client-nom');
   const telInput = document.getElementById('client-tel');
@@ -571,14 +570,12 @@ async function ajouterClient() {
   const montantDette = montantInput ? montantInput.value.trim() : '';
   const noteDette = noteInput ? noteInput.value.trim() : '';
   
-  // Vérification du nom
   if (!nom) { 
     montrerAlerte('Entrez le nom svp'); 
     nomInput.focus();
     return; 
   }
 
-  // Vérification du montant
   if (montantDette === '') {
     montrerAlerte('Entrez le montant svp');
     montantInput.focus();
@@ -788,10 +785,10 @@ function fermerOperation() {
   if (formOp) formOp.style.display = 'none';
 }
 
+// VÉRIFICATION DE LA LOGIQUE DE PAIEMENT : LE PAIEMENT NE PEUT PAS DÉPASSER LA DETTE DE LA DEVISE
 async function enregistrerOperation() {
   const montantInput = document.getElementById('op-montant');
   const noteInput = document.getElementById('op-note');
-  const msg = document.getElementById('op-msg');
   const btn = document.getElementById('btn-valider-op');
   if (!montantInput) return;
 
@@ -801,6 +798,17 @@ async function enregistrerOperation() {
   if (!(montant > 0)) { 
     montrerAlerte('Montant invalide svp.'); 
     return; 
+  }
+
+  // Si c'est un paiement, on vérifie que le montant ne dépasse pas la dette actuelle dans cette devise
+  if (typeOp === 'paiement') {
+    const bal = await calculerSolde(clientActuel.id);
+    let detteActuelleDevise = (deviseChoisie === '$') ? bal.usd : bal.fc;
+
+    if (montant > detteActuelleDevise) {
+      montrerAlerte(`Le paiement (${montant.toLocaleString()} ${deviseChoisie}) dépasse la dette restante (${detteActuelleDevise.toLocaleString()} ${deviseChoisie}) !`);
+      return;
+    }
   }
 
   btn.disabled = true;
