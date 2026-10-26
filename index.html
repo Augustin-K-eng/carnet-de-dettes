@@ -112,6 +112,15 @@ button:disabled{opacity:0.7;cursor:not-allowed}
   </div>
 </div>
 
+<!-- MODAL ALERTE (AVEC BOUTON OK) -->
+<div id="modal-alerte" class="modal">
+  <div class="modal-box" style="text-align: center;">
+    <h2 style="color:#e67e22; margin-top:0;">⚠️ Avertissement</h2>
+    <p id="modal-alerte-texte" style="font-size: 16px; color: #333; margin-bottom: 20px;"></p>
+    <button class="btn-green" onclick="fermerModalAlerte()">OK</button>
+  </div>
+</div>
+
 <!-- PAGE CONNEXION -->
 <div id="page-login" class="page active">
   <div class="bg-drapeau"></div>
@@ -287,6 +296,20 @@ function jouerSonErreur() {
   }
 }
 
+// Fonction pour afficher la fenêtre modale d'alerte avec le son
+function montrerAlerte(texte) {
+  jouerSonErreur();
+  const texteEl = document.getElementById('modal-alerte-texte');
+  const modal = document.getElementById('modal-alerte');
+  if (texteEl) texteEl.textContent = texte;
+  if (modal) modal.classList.add('active');
+}
+
+function fermerModalAlerte() {
+  const modal = document.getElementById('modal-alerte');
+  if (modal) modal.classList.remove('active');
+}
+
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -385,7 +408,7 @@ async function ouvrirAdminPrompt() {
     }
     afficher('page-admin');
   } else if (mdp !== null) { 
-    alert("Incorrect"); 
+    montrerAlerte("Incorrect"); 
   }
 }
 
@@ -396,11 +419,11 @@ async function sInscrire() {
   const msg = document.getElementById('reg-msg');
   const btn = document.getElementById('btn-reg');
   
-  if (!nom || !tel || !pin) { msg.textContent = 'Remplir tous les champs.'; return; }
-  if (pin.length !== 4) { msg.textContent = 'PIN 4 chiffres requis.'; return; }
+  if (!nom || !tel || !pin) { montrantAlerte('Remplir tous les champs.'); return; }
+  if (pin.length !== 4) { montrerAlerte('PIN 4 chiffres requis.'); return; }
 
   if (!navigator.onLine) {
-    msg.textContent = 'Impossible de créer un compte hors ligne.';
+    montrerAlerte('Impossible de créer un compte hors ligne.');
     return;
   }
 
@@ -412,7 +435,7 @@ async function sInscrire() {
   btn.disabled = false;
   btn.innerHTML = 'Créer mon compte';
 
-  if (error) { msg.textContent = 'Erreur ou numéro existant.'; return; }
+  if (error) { montrerAlerte('Erreur ou numéro existant.'); return; }
   msg.style.color = 'green';
   msg.textContent = 'Compte créé !';
   setTimeout(() => afficher('page-login'), 1500);
@@ -424,7 +447,7 @@ async function seConnecter() {
   const msg = document.getElementById('login-msg');
   const btn = document.getElementById('btn-login');
 
-  if (!tel || !pin) { msg.textContent = 'Remplir tous les champs.'; return; }
+  if (!tel || !pin) { montrerAlerte('Remplir tous les champs.'); return; }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Connexion...';
@@ -435,7 +458,7 @@ async function seConnecter() {
     btn.innerHTML = 'Se connecter';
 
     if (error || !data) {
-      msg.textContent = 'Identifiants incorrects.';
+      montrerAlerte('Identifiants incorrects.');
       return;
     }
     vendeurId = data.id;
@@ -451,11 +474,11 @@ async function seConnecter() {
         vendeurId = user.id;
         localStorage.setItem('vendeur_id', vendeurId);
       } else {
-        msg.textContent = 'PIN incorrect.';
+        montrerAlerte('PIN incorrect.');
         return;
       }
     } else {
-      msg.textContent = 'Connexion internet requise pour une première connexion.';
+      montrerAlerte('Connexion internet requise pour une première connexion.');
       return;
     }
   }
@@ -533,7 +556,7 @@ async function calculerSolde(clientId) {
   return { fc, usd };
 }
 
-// VALIDATION : "Entrez le nom" et/ou "Entrez le montant" avec sons
+// VALIDATION AVEC LA FENÊTRE MODALE STYLE "SUPPRESSION" ET BOUTON OK
 async function ajouterClient() {
   const nomInput = document.getElementById('client-nom');
   const telInput = document.getElementById('client-tel');
@@ -548,26 +571,23 @@ async function ajouterClient() {
   const montantDette = montantInput ? montantInput.value.trim() : '';
   const noteDette = noteInput ? noteInput.value.trim() : '';
   
-  // Condition 1 : Nom vide
+  // Vérification du nom
   if (!nom) { 
-    msg.textContent = 'Entrez le nom'; 
-    jouerSonErreur();
+    montrerAlerte('Entrez le nom'); 
     nomInput.focus();
     return; 
   }
 
-  // Condition 2 : Montant vide alors qu'on essaie de mettre une dette ou un montant
+  // Vérification du montant
   if (montantDette === '') {
-    msg.textContent = 'Entrez le montant';
-    jouerSonErreur();
+    montrerAlerte('Entrez le montant');
     montantInput.focus();
     return;
   }
 
   const montantNum = parseFloat(montantDette) || 0;
   if (!(montantNum > 0)) {
-    msg.textContent = 'Montant invalide';
-    jouerSonErreur();
+    montrerAlerte('Montant invalide');
     montantInput.focus();
     return;
   }
@@ -579,10 +599,9 @@ async function ajouterClient() {
     const { data, error } = await sb.from('clients').insert([{ nom, telephone: tel, vendeur_id: vendeurId }]).select().single();
     
     if (error || !data) {
-      msg.textContent = "Erreur lors de la création du client.";
+      montrerAlerte("Erreur lors de la création du client.");
       btn.disabled = false;
       btn.innerHTML = 'Enregistrer';
-      jouerSonErreur();
       return;
     }
 
@@ -754,7 +773,7 @@ async function confirmerSuppressionClient() {
       btn.innerHTML = 'Oui, supprimer';
     }
   } else {
-    alert("La suppression nécessite une connexion internet.");
+    montrerAlerte("La suppression nécessite une connexion internet.");
     fermerModalConfirm();
     return;
   }
@@ -780,8 +799,7 @@ async function enregistrerOperation() {
   const note = noteInput ? noteInput.value.trim() : '';
   
   if (!(montant > 0)) { 
-    msg.textContent = 'Montant invalide.'; 
-    jouerSonErreur();
+    montrerAlerte('Montant invalide.'); 
     return; 
   }
 
