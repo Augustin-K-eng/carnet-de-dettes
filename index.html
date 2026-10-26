@@ -643,7 +643,7 @@ async function chargerOperations(clientId) {
   });
 }
 
-// LOGIQUE CORRIGÉE : SI LES DEUX DETTES EXISTENT, AUCUN BLOCAGE N'EST APPLIQUÉ
+// CORRECTION : RAFRAÎCHISSEMENT INSTANTANÉ DES DONNÉES AVANT DE VÉRIFIER LES DEVISES
 async function ouvrirOperation(type) {
   typeOp = type;
   
@@ -655,6 +655,7 @@ async function ouvrirOperation(type) {
   if (btnUsd) btnUsd.classList.remove('disabled-devise');
 
   if (type === 'paiement') {
+    // Forcer un recalcul immédiat basé sur les données fraîches
     const bal = await calculerSolde(clientActuel.id);
     let aFC = bal.fc > 0;
     let aUSD = bal.usd > 0;
@@ -669,9 +670,9 @@ async function ouvrirOperation(type) {
       choisirDevise('$');
       if (btnFc) btnFc.classList.add('disabled-devise');
     } 
-    // Si le client a les DEUX dettes (FC et $) -> ON NE BARRE RIEN, libre choix total !
+    // Si le client a les DEUX dettes (FC et $) -> ON NE BARRE RIEN, les deux sont cliquables !
     else {
-      choisirDevise('FC'); // Par défaut, mais les deux boutons restent cliquables
+      choisirDevise('FC'); 
     }
   } else {
     choisirDevise('FC');
@@ -765,7 +766,8 @@ async function enregistrerOperation() {
   btn.innerHTML = 'Valider';
 
   fermerOperation();
-  await chargerClients();
+  
+  // MISE À JOUR INSTANTANÉMENT DE L'INTERFACE SANS RAFRAÎCHIR LA PAGE
   await ouvrirClient(clientActuel);
 }
 
