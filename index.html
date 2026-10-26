@@ -709,7 +709,6 @@ async function ouvrirOperation(type) {
   if (btnFc) btnFc.classList.remove('disabled-devise');
   if (btnUsd) btnUsd.classList.remove('disabled-devise');
 
-  // La note s'affiche pour '+ Dette' et se masque pour '- Paiement'
   if (opNote) {
     opNote.style.display = (type === 'dette') ? 'block' : 'none';
   }
